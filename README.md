@@ -50,10 +50,15 @@ follows, with defaults in square brackets:
 -   **BSDPY\_NBI\_URL** - Alternate base URL for boot images (HTTP/NFS) -
     (optional)
 
+-   **REDIS\_SERVER** - name or hostname and port listen on - *['redis:6379']* -
+    (optional)
+
 -   **BSDPY\_API\_URL** - API endpoint to obtain NBI entitlements - (optional)
 
 -   **BSDPY\_API\_KEY** - API key to use in conjunction with BSDPY\_API\_URL -
     (required with API URL)
+
+
 
  
 
@@ -494,5 +499,71 @@ Docker run mode
 ### Single Docker host
 
 ### Multiple Docker hosts
+A same Makefile
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+SHELL:=/bin/bash
 
- 
+default: run
+
+networks:
+	docker network ls | egrep -w "bsdpy" > /dev/null; if [[ "$$?" != 0 ]]; then docker network create -d bridge bsdpy; fi
+
+
+run:
+	make networks
+	docker-compose up -d
+
+stop:
+	docker-compose stop || true
+
+clean:
+	docker-compose kill || true
+	docker-compose rm -f || true
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+A sample docker-compose.yml file might look something like this:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+version: '2'
+services:
+  web:
+    image: macadmins/netboot-httpd
+    ports:
+      - 80:80
+    command: nginx -g "daemon off;"
+    volumes:
+      - ${DATA_DIR}:/nbi
+    restart: always
+
+  tftpd:
+    image: macadmins/tftpd
+    ports:
+      - 69:69/udp
+    command: /usr/sbin/in.tftpd --listen --foreground --verbosity=10 --user user -B 1468 /nbi
+    volumes:
+      - ${DATA_DIR}:/nbi
+    restart: always
+
+  redis:
+    image: redis
+    restart: always
+
+  bsdpy:
+    image: erikaulin/bsdpy
+    ports:
+      - 667:67/udp
+    command: /start.sh
+    volumes:
+      - ${DATA_DIR}:/nbi
+    environment:
+      BSDPY_IFACE: eth0
+      BSDPY_NBI_URL: http://${IP}
+      BSDPY_IP: ${IP}
+      REDIS_SERVER: redis:6379
+    restart: always
+
+networks:
+  default:
+    external:
+      name: "bsdpy"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
