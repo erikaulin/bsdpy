@@ -164,7 +164,7 @@ try:
     for envkey, envvalue in os.environ.iteritems():
         if envkey.startswith('BSDPY'):
             dockervars[envkey] = envvalue
-        if envkey.startswith('DB'):
+        if envkey.startswith('REDIS'):
             redisvars[envkey] = envvalue
 
 except KeyError as e:
@@ -182,8 +182,8 @@ if len(dockervars) > 0:
 if len(redisvars) > 0:
     from redis import StrictRedis
     useredis = True
-    redishost = redisvars['DB_PORT_6379_TCP_ADDR']
-    redisport = redisvars['DB_PORT_6379_TCP_PORT']
+    redishost = redisvars['REDIS_SERVER'].split(':')[0]
+    redisport = redisvars['REDIS_SERVER'].split(':')[1]
     redis = StrictRedis(host=redishost, port=redisport)
     logging.debug('Using Redis caching for clients to host %s on port %s' % (redishost, redisport))
 else:
@@ -270,7 +270,7 @@ try:
 
         else:
             if 'http' in bootproto:
-                basedmgpath = 'http://' + serverip_str + tftprootpath + '/'
+                basedmgpath = 'http://' + serverip_str + '/'
                 nbiurl = basedmgpath
                 logging.debug('Using HTTP basedmgpath %s' % basedmgpath)
             if 'nfs' in bootproto:
@@ -444,24 +444,32 @@ def getNbiOptions(incoming):
                     if nbimageinfo.get('RootPath'):
                         bootimage = find(nbimageinfo.get('RootPath'), path)[0]
                         if os.path.islink(bootimage):
-                            thisnbi['dmg'] = \
-                                '/'.join(os.path.realpath(bootimage).split('/')[2:])
+                            relativepath = os.path.realpath(bootimage).split('/')
+                            for i in tftprootpath.split('/'):
+                                relativepath.remove(i)
+                            thisnbi['dmg'] = '/'.join(relativepath)
                             logging.debug('Image %s RootPath is a symlink, resolving...'
                                 % nbimageinfo['Name'])
                         else:
-                            thisnbi['dmg'] = \
-                                '/'.join(bootimage.split('/')[2:])
+                            relativepath = bootimage.split('/')
+                            for i in tftprootpath.split('/'):
+                                relativepath.remove(i)
+                            thisnbi['dmg'] = '/'.join(relativepath)
                     else:
                         for dmgtype in ('dmg', 'sparseimage'):
                             bootimage = find('*.%s' % dmgtype, path)[0]
                             if os.path.islink(bootimage):
-                                thisnbi['dmg'] = \
-                                    '/'.join(os.path.realpath(bootimage).split('/')[2:])
+                                relativepath = os.path.realpath(bootimage).split('/')
+                                for i in tftprootpath.split('/'):
+                                    relativepath.remove(i)
+                                thisnbi['dmg'] = '/'.join(relativepath)
                                 logging.debug('Image %s RootPath is a symlink, resolving...'
                                     % nbimageinfo['Name'])
                             else:
-                                thisnbi['dmg'] = \
-                                    '/'.join(bootimage.split('/')[2:])
+                                relativepath = bootimage.split('/')
+                                for i in tftprootpath.split('/'):
+                                    relativepath.remove(i)
+                                thisnbi['dmg'] = '/'.join(relativepath)
 
 
                 thisnbi['enabledmacaddrs'] = \
